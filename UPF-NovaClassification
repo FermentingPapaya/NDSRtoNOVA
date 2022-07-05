@@ -3,7 +3,7 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 library(data.table)
-
+library(ggplot2)
 
 ## Import Data
 data01 <- read_excel("[spreadsheet with NDSR file 1 output")
