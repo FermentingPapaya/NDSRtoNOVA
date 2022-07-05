@@ -1,5 +1,5 @@
 # NDSRtoNOVA
-This code calculates the percentage of calories or grams from each NOVA classification of food consumed by a participant. 
+This code calculates the percentage of calories or grams from each NOVA classification (unprocessed to ultraprocessed foods) of food consumed by a participant. 
 
 Use file 1 from NDSR.  
 Assign a NOVA score each food consumed.  I deduped the tab-delimited output file and created a list of each food that we needed to classify.  
