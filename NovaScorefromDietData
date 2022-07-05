@@ -1,0 +1,91 @@
+## Load Packages
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(data.table)
+
+
+## Import Data
+data01 <- read_excel("[spreadsheet with NDSR file 1 output")
+#summary(data01)
+df1 <- as.data.frame(data01)
+
+
+## Create NOVA Scores
+# This will likely be over a thousand lines long. I just included a few examples from our data set. 
+
+NewDF <-
+df1 %>%
+mutate(NovaScore = case_when(
+FoodName == 'beef, brisket, fresh, no visible fat eaten' ~ 1, 
+FoodName	==	"beverages, juice or flavored drink, brand name listing, Capri-Sun, Capri-Sun - all flavors"	~	4	,
+FoodName	==	"cheese, Monterey Jack cheese, natural"	~	3	,
+FoodName	==	"fats, butter, regular, salted"	~	2	,
+FoodName	==	"yogurt, vanilla, regular, nonfat (<1% fat)"	~	4	
+))
+
+# I used this to double check that the new NovaScore variable does not have any empty cells
+sum(is.na(NewDF$NovaScore)) 
+
+# creates a wide dataframe. cpartid=participant ID. 
+#for each participant there is a variable for the sum of all calories in each classification (4) and sum of all grams of food in each classigfication (4)
+dfNova <- data.table::dcast(setDT(NewDF), cpartid ~ NovaScore, value.var= c('Energy_kcal_ByFood', 'GramAmountofFood'), 
+      fun.aggregate = sum) 
+View(dfNova)
+
+
+#merge data frames.  df49 is a dataframe with files 4 and 9 from NDSR.  The only common variable is cpartid, so they will line up on participant ID.  I also made sure that both dataframes contain the exact same observations
+dfAll<- merge.data.frame(df49, dfNova)
+
+#Because we took an average of the recalls (or left it alone if only one recall) for info from files 4 and 9, we need to divide kcals by 2 for those with 2 recalls.  I created a column previously in the df49 dataframe that had the number of recalls for each participant.  Will divide by that number. 
+#create new variable
+dfAll$Nova1_cal <- (dfAll$Energy_kcal_ByFood_1/dfAll$NumOfRecalls)
+dfAll$Nova2_cal <- (dfAll$Energy_kcal_ByFood_2/dfAll$NumOfRecalls)
+dfAll$Nova3_cal <- (dfAll$Energy_kcal_ByFood_3/dfAll$NumOfRecalls)
+dfAll$Nova4_cal <- (dfAll$Energy_kcal_ByFood_4/dfAll$NumOfRecalls)
+
+#create variable for the percentage of calories from each nova group for each participant
+dfAll$Nova1_pct_cal <- (dfAll$Nova1_cal/dfAll$kcal)*100
+dfAll$Nova2_pct_cal <- (dfAll$Nova2_cal/dfAll$kcal)*100
+dfAll$Nova3_pct_cal <- (dfAll$Nova3_cal/dfAll$kcal)*100
+dfAll$Nova4_pct_cal <- (dfAll$Nova4_cal/dfAll$kcal)*100
+
+# checking that it all lines up
+justNova <- dfAll[, c("cpartid", "Nova1_cal", "Nova2_cal", "Nova3_cal", "Nova4_cal", "Nova1_pct_cal", "Nova1_pct_cal", "Nova1_pct_cal", "Nova1_pct_cal", "kcal")] 
+justNova$Allkcal <- justNova$Nova1_cal + justNova$Nova2_cal + justNova$Nova3_cal + justNova$Nova4_cal 
+# ifelse(justNova$Allkcal==justNova$kcal,"Y","No not a Match") #some of them differ in the decimals, so this won't work
+justNova$diff_cal <- justNova$Allkcal - justNova$kcal
+ifelse(justNova$diff_cal> 1, "Not a Match", "Y")
+ifelse(justNova$diff_cal < -1, "Not a Match", "Y") # This confirms that the kcal from the NDSR output for the observation is the same as what I get when I add up the calories from all 4 foods.  These are all the same within 1 calorie. 
+
+
+# We are likely using percent calories, but going to also create gram variables to have them
+# Divide grams in each category by number of recalls. Create new variable.
+dfAll$Nova1_grams <- (dfAll$GramAmountofFood_1/dfAll$NumOfRecalls)
+dfAll$Nova2_grams <- (dfAll$GramAmountofFood_2/dfAll$NumOfRecalls)
+dfAll$Nova3_grams <- (dfAll$GramAmountofFood_3/dfAll$NumOfRecalls)
+dfAll$Nova4_grams <- (dfAll$GramAmountofFood_4/dfAll$NumOfRecalls)
+
+# create variable for the percentage of GRAMS from each nova group
+dfAll$Nova1_pct_grams <- (dfAll$Nova1_grams/dfAll$TotalGrams)*100
+dfAll$Nova2_pct_grams <- (dfAll$Nova2_grams/dfAll$TotalGrams)*100
+dfAll$Nova3_pct_grams <- (dfAll$Nova3_grams/dfAll$TotalGrams)*100
+dfAll$Nova4_pct_grams <- (dfAll$Nova4_grams/dfAll$TotalGrams)*100
+
+# Descriptives 
+summary(dfAll$Nova4_pct_cal)
+sd(dfAll$Nova4_pct_cal)
+shapiro.test(dfAll$Nova4_pct_cal)
+
+#Histogram 
+ggplot(dfAll, aes(x=Nova4_pct_cal)) + 
+  geom_histogram(aes(), colour="white", fill="#63d297", bins = 40)+
+ geom_density(alpha=.2, fill="light green")+ 
+ geom_vline(aes(xintercept=mean(Nova4_pct_cal)),
+            color="red", linetype="dashed", size=1)+
+  labs(title="Percentage of Calories from Ultra-Processed Foods",x="Percentage of Calories from Nova 4 Foods", y = "Count")+
+  theme_classic()+
+  ylim(0,20)+
+  xlim(0, 100)
+
+
